@@ -36,6 +36,23 @@ pub mod blueshift_anchor_vault {
     }
 
     pub fn withdraw(ctx: Context<VaultAction>, amount: u64) -> Result<()> {
+        require_neq!(ctx.accounts.vault.lamports(), 0, VaultError::InvalidAmount);
+
+        let signer_key = ctx.accounts.signer.key();
+        let signer_seeds = &[b"vault", signer_key.as_ref(), &[ctx.bumps.vault]];
+
+        transfer(
+            CpiContext::new_with_signer(
+                ctx.accounts.system_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.vault.to_account_info(),
+                    to: ctx.accounts.signer.to_account_info(),
+                },
+                &[&signer_seeds[..]],
+            ),
+            ctx.accounts.vault.lamports(),
+        )?;
+
         Ok(())
     }
 }
@@ -46,7 +63,7 @@ pub struct VaultAction<'info> {
     pub signer: Signer<'info>,
 
     #[account(mut,
-    seeds = [b"vault_account", signer.key().as_ref()],
+    seeds = [b"vault", signer.key().as_ref()],
     bump,
     )]
     pub vault: SystemAccount<'info>,
