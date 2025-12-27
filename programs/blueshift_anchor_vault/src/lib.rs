@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::system_program::{transfer, Transfer};
 
 // declare_id!("5hf3H8py8w5VjTrCeDMZw7yr6PEkiwhCB67wHdZ2cfp");
 declare_id!("22222222222222222222222222222222222222222222");
@@ -8,6 +9,29 @@ pub mod blueshift_anchor_vault {
     use super::*;
 
     pub fn deposit(ctx: Context<VaultAction>, amount: u64) -> Result<()> {
+        require_eq!(
+            ctx.accounts.vault.lamports(),
+            0,
+            VaultError::VaultAlreadyExists
+        );
+
+        require_gt!(
+            amount,
+            Rent::get()?.minimum_balance(0),
+            VaultError::InvalidAmount
+        );
+
+        transfer(
+            CpiContext::new(
+                ctx.accounts.system_program.to_account_info(),
+                Transfer {
+                    from: ctx.accounts.signer.to_account_info(),
+                    to: ctx.accounts.vault.to_account_info(),
+                },
+            ),
+            amount,
+        )?;
+
         Ok(())
     }
 
@@ -25,7 +49,7 @@ pub struct VaultAction<'info> {
     seeds = [b"vault_account", signer.key().as_ref()],
     bump,
     )]
-    pub vault_account: SystemAccount<'info>,
+    pub vault: SystemAccount<'info>,
     pub system_program: Program<'info, System>,
 }
 
